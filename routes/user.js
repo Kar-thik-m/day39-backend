@@ -2,7 +2,7 @@ import express from 'express';
 import { AppUserModel } from '../db-connect/model.js';
 import { v4 } from 'uuid';
 import bcrypt from 'bcrypt';
-import crypto from 'crypto';
+
 import { transport,mailOptions } from './mail.js';
 const authRouter = express.Router();
 
@@ -21,7 +21,7 @@ authRouter.post('/register', async (req, res) => {
                 res.status(500).send({ msg: 'Error in registring' });
                 return;
             }
-            const authuser = new AppUserModel({ ...payload, password: hash, id: v4(), isVerified: false });
+            const authuser = new AppUserModel({ ...payload, password: hash, id: v4() });
             await authuser.save();
         })
         res.send({ msg: 'user register successfully ' });
@@ -40,8 +40,8 @@ authRouter.post('/login', async function (req, res) {
         const payload = req.body;
         const appUser = await AppUserModel.findOne({ email: payload.email }, { id: 1, name: 1, email: 1, password: 1, _id: 0 });
         if (appUser) {
-             bcrypt.compare(payload.password, appUser.password, (err, result) => {
-                if (err) {
+             bcrypt.compare(payload.password, appUser.password, (_err, result) => {
+                if (!result) {
                     res.status(401).send({ msg: "invalid credentials" });
                 } else {
                     const responceObj = appUser.toObject();
