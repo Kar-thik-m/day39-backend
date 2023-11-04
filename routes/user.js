@@ -32,16 +32,7 @@ authRouter.post('/register', async (req, res) => {
 });
 
 
-authRouter.get('/:email', async function (req, res) {
-    try {
-        const email = req.params.email;
-        const appUser = await AppUserModel.findOne({ email }, { id: 1, name: 1, email: 1, _id: 0 });
-        res.send(appUser);
-    } catch (err) {
-        console.log(err);
-        res.status(500).send({ msg: 'Error occuerred while fetching users' });
-    }
-});
+
 
 
 authRouter.post('/login', async function (req, res) {
@@ -69,71 +60,47 @@ authRouter.post('/login', async function (req, res) {
     }
 });
 
-
-authRouter.post('/password', async function (req, res) {
+authRouter.post('password',async(req,res)=>{
+    const payload=req.body;
+    const appUser=await AppUserModel.findOne({ email:payload.email }, { name: 1, email: 1, _id: 0 });
     try {
-        const resetKey = crypto.randomBytes(32).toString('hex');
-        const payload = req.body;
-        const appUser = await AppUserModel.findOne({ email: payload.email }, { name: 1, email: 1, _id: 0 });
-        const cloudUser = await AppUserModel.updateOne({ email: payload.email }, { '$set': { ResetKey: resetKey } });
+    
         if (appUser) {
             const responceObj = appUser.toObject();
-            const link = `${process.env.FRONTEND_URL}/?reset=${resetKey}`
-            console.log(link)
-            await transport.sendMail({ ...mailOptions, to: payload.email, text: link });
+            const link = `${process.env.FRONTEND_URL}/?resetpassword`;
+            console.log(link);
+    
+            await transport.sendMail({
+                ...mailOptions,
+                to: payload.email,
+                text: link,
+            });
+    
             res.send({ responceObj, msg: 'user updated ' });
-        }
-        else {
+        } else {
             res.status(404).send({ msg: 'user not found' });
         }
-    }
-    catch (err) {
+    } catch (err) {
         console.log(err);
     }
-});
+})
 
-authRouter.put('/validate', async function (req, res) {
-    const payload = req.body;
-    try {
-        const appUser = await AppUserModel.findOne({ ResetKey: payload.resetKey }, { ResetKey: 1, _id: 0 });
-        if (!appUser) {
-            res.status(404).send({ msg: 'key not found' });
-            console.log("payload");
-        } else {
-            if (payload.resetKey === appUser.ResetKey) {
-                console.log("true");
-                res.send("true");
-            } else {
-                console.log("false");
-                res.send("false");
-            }
-        }
-    } catch {
-        res.status(404).send({ msg: 'user not found 123' });
+authRouter.put('/resetpassword',async (req,res)=>{
+    try{
+        const payload=req.body;
+        
+            
+           const hashedPassword=await bcrypt.hash(payload.password,10)
+          
+            await AppUserModel.updateOne({email:payload.email},{'$set':{password:hashedPassword,}});
+            res.send({msg:"updated password"})
+       
+    
+    }catch{
+        res.status(500).send({msg:"passwords updation failed"})  
     }
 })
 
 
-authRouter.put('/reset', async function (req, res) {
-    const payload = req.body;
 
-    try {
-        // hashing the password for storing in db
-        bcrypt.hash(payload.password, 10, async function (err, hash) {
-            if (err) {
-                res.status(400).send({ msg: 'Error in reseting' });
-                return;
-            }
-            await AppUserModel.updateOne({ email: payload.email }, { '$set': { password: hash } });
-            res.send({ msg: 'user updated ' });
-        })
-    } catch (err) {
-        console.log(err);
-        res.status(500).send({ msg: 'Error in updating' })
-    }
-
-
-
-
-});
 export default authRouter;
